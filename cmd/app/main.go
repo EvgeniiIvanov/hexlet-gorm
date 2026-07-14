@@ -51,10 +51,14 @@ func main() {
 		log.Fatalf("ошибка пинга базы: %v", err)
 	}
 
+	if err := db.AutoMigrate(&models.Movie{}); err != nil {
+		log.Fatalf("ошибка миграции: %v", err)
+	}
+
 	var movie models.Movie
-	if err := db.First(&movie).Error; err != nil {
+	if err := db.First(&movie, 2).Error; err != nil {
 		log.Fatalf("ошибка чтения: %v", err)
 	}
 
-	log.Printf("пользователь загружен: %s <%s>", movie.Title, movie.Genre)
+	log.Printf("фильм загружен: %s <%s>, рейтинг: %f", movie.Title, movie.Genre, movie.Rating)
 }

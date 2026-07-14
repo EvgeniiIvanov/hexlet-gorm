@@ -6,4 +6,5 @@ type Movie struct {
 	Genre       string
 	ReleasedAt  string
 	Description string
+	Rating      float64 `gorm:"type:numeric(3,1)"`
 }

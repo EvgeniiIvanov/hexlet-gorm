@@ -10,13 +10,9 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-)
 
-type User struct {
-	ID    uint
-	Name  string
-	Email string
-}
+	"github.com/EvgeniiIvanov/hexlet-gorm/internal/models"
+)
 
 func main() {
 	err := godotenv.Load()
@@ -55,19 +51,10 @@ func main() {
 		log.Fatalf("ошибка пинга базы: %v", err)
 	}
 
-	// Auto-migrate the schema
-	if err := db.AutoMigrate(&User{}); err != nil {
-		log.Fatalf("ошибка миграции: %v", err)
-	}
-
-	if err := db.Create(&User{Name: "Анна", Email: "anna@example.com"}).Error; err != nil {
-		log.Fatalf("ошибка вставки: %v", err)
-	}
-
-	var user User
-	if err := db.First(&user).Error; err != nil {
+	var movie models.Movie
+	if err := db.First(&movie).Error; err != nil {
 		log.Fatalf("ошибка чтения: %v", err)
 	}
 
-	log.Printf("пользователь загружен: %s <%s>", user.Name, user.Email)
+	log.Printf("пользователь загружен: %s <%s>", movie.Title, movie.Genre)
 }

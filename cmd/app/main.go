@@ -76,6 +76,10 @@ func main() {
 		handleUpdate(db, os.Args)
 	case "delete":
 		handleDelete(db, os.Args)
+	case "unrated":
+		handleUnrated(db)
+	case "most_rated":
+		handleMostRated(db)
 	default:
 		log.Fatal("unknown action")
 	}
@@ -133,4 +137,26 @@ func handleDelete(db *gorm.DB, args []string) {
 		log.Fatal(err)
 	}
 	log.Println("movie deleted")
+}
+
+func handleUnrated(db *gorm.DB) {
+	var movies []models.Movie
+	if err := db.Where("rating IS NULL").Find(&movies).Error; err != nil {
+		log.Fatal(err)
+	}
+	for _, movie := range movies {
+		log.Printf("movie: %s", movie.Title)
+	}
+	log.Printf("unrated movies: %d", len(movies))
+}
+
+func handleMostRated(db *gorm.DB) {
+	var movies []models.Movie
+	if err := db.Where("rating > ?", 8.5).Find(&movies).Error; err != nil {
+		log.Fatal(err)
+	}
+	for _, movie := range movies {
+		log.Printf("movie: %s", movie.Title)
+	}
+	log.Printf("most rated movies: %d", len(movies))
 }

@@ -15,6 +15,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 3 {
+		log.Fatal("usage: movies <list|create|show|update|delete> [args]")
+	}
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("ошибка загрузки .env file")
@@ -55,10 +59,78 @@ func main() {
 		log.Fatalf("ошибка миграции: %v", err)
 	}
 
-	var movie models.Movie
-	if err := db.First(&movie, 2).Error; err != nil {
-		log.Fatalf("ошибка чтения: %v", err)
+	entity := os.Args[1]
+	action := os.Args[2]
+	if entity != "movies" {
+		log.Fatal("only movies supported")
 	}
 
-	log.Printf("фильм загружен: %s <%s>, рейтинг: %f", movie.Title, movie.Genre, movie.Rating)
+	switch action {
+	case "list":
+		handleList(db)
+	case "create":
+		handleCreate(db, os.Args)
+	case "show":
+		handleShow(db, os.Args)
+	case "update":
+		handleUpdate(db, os.Args)
+	case "delete":
+		handleDelete(db, os.Args)
+	default:
+		log.Fatal("unknown action")
+	}
+}
+
+func handleList(db *gorm.DB) {
+	var movies []models.Movie
+	if err := db.Find(&movies).Error; err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("movies: %d", len(movies))
+}
+
+func handleCreate(db *gorm.DB, args []string) {
+	if len(args) < 6 {
+		log.Fatal("usage: movies create <title> <genre> <released_at>")
+	}
+	releasedAt, err := time.Parse("2006-01-02", args[5])
+	if err != nil {
+		log.Fatal(err)
+	}
+	movie := models.Movie{
+		Title:      args[3],
+		Genre:      args[4],
+		ReleasedAt: releasedAt,
+	}
+	if err := db.Create(&movie).Error; err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("created movie id=%d", movie.ID)
+}
+
+func handleShow(db *gorm.DB, args []string) {
+	var movie models.Movie
+	if err := db.First(&movie, args[3]).Error; err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("movie: %s (%s)", movie.Title, movie.Genre)
+}
+
+func handleUpdate(db *gorm.DB, args []string) {
+	if len(args) < 6 {
+		log.Fatal("usage: movies update <id> <field> <value>")
+	}
+	if err := db.Model(&models.Movie{}).
+		Where("id = ?", args[3]).
+		Update(args[4], args[5]).Error; err != nil {
+		log.Fatal(err)
+	}
+	log.Println("movie updated")
+}
+
+func handleDelete(db *gorm.DB, args []string) {
+	if err := db.Delete(&models.Movie{}, args[3]).Error; err != nil {
+		log.Fatal(err)
+	}
+	log.Println("movie deleted")
 }

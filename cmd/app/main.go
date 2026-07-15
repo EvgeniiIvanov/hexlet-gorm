@@ -55,7 +55,7 @@ func main() {
 		log.Fatalf("ошибка пинга базы: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Movie{}); err != nil {
+	if err := db.AutoMigrate(&models.Movie{}, &models.Actor{}, &models.Director{}); err != nil {
 		log.Fatalf("ошибка миграции: %v", err)
 	}
 
@@ -114,10 +114,16 @@ func handleCreate(db *gorm.DB, args []string) {
 
 func handleShow(db *gorm.DB, args []string) {
 	var movie models.Movie
-	if err := db.First(&movie, args[3]).Error; err != nil {
+	if err := db.Preload("Director").Preload("Actors").First(&movie, args[3]).Error; err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("movie: %s (%s)", movie.Title, movie.Genre)
+	if movie.Director.Name != "" {
+		log.Printf("director: %s", movie.Director.Name)
+	}
+	for _, actor := range movie.Actors {
+		log.Printf("actor: %s", actor.Name)
+	}
 }
 
 func handleUpdate(db *gorm.DB, args []string) {

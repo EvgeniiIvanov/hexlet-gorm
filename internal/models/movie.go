@@ -9,4 +9,7 @@ type Movie struct {
 	ReleasedAt  time.Time
 	Description string
 	Rating      float64 `gorm:"type:numeric(3,1)"`
+	DirectorID  uint
+	Director    Director
+	Actors      []Actor `gorm:"many2many:movie_actors;"`
 }

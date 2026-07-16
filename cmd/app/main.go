@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -55,7 +56,7 @@ func main() {
 		log.Fatalf("ошибка пинга базы: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.Movie{}, &models.Actor{}, &models.Director{}); err != nil {
+	if err := db.AutoMigrate(&models.Movie{}, &models.Actor{}, &models.Director{}, &models.Review{}); err != nil {
 		log.Fatalf("ошибка миграции: %v", err)
 	}
 
@@ -80,6 +81,8 @@ func main() {
 		handleUnrated(db)
 	case "most_rated":
 		handleMostRated(db)
+	case "add_review":
+		handleAddReview(db, os.Args)
 	default:
 		log.Fatal("unknown action")
 	}
@@ -171,4 +174,43 @@ func handleMostRated(db *gorm.DB) {
 		log.Printf("movie: %s", movie.Title)
 	}
 	log.Printf("most rated movies: %d", len(movies))
+}
+
+func handleAddReview(db *gorm.DB, args []string) {
+	if len(args) < 6 {
+		log.Fatal("usage: movies add_review <movie_id> <score> <text>")
+	}
+
+	movieID, err := strconv.ParseUint(args[3], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	score, err := strconv.Atoi(args[4])
+	if err != nil {
+		log.Fatal(err)
+	}
+	text := args[5]
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		review := models.Review{
+			MovieID: uint(movieID),
+			Score:   score,
+			Text:    text,
+		}
+		if err := tx.Create(&review).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&models.Movie{}).
+			Where("id = ?", movieID).
+			Update("reviews_count", gorm.Expr("reviews_count + 1")).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 }

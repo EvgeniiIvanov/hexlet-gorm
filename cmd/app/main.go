@@ -87,8 +87,14 @@ func main() {
 
 func handleList(db *gorm.DB) {
 	var movies []models.Movie
-	if err := db.Find(&movies).Error; err != nil {
+	if err := db.Preload("Director").Find(&movies).Error; err != nil {
 		log.Fatal(err)
+	}
+	for _, movie := range movies {
+		log.Printf("movie: %s", movie.Title)
+		if movie.Director.ID != 0 {
+			log.Printf("director: %s", movie.Director.Name)
+		}
 	}
 	log.Printf("movies: %d", len(movies))
 }

@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Movie struct {
 	ID           uint
@@ -45,4 +49,16 @@ type MovieLeaderboardDTO struct {
 	Rating       float64
 	ReviewsCount int
 	Rank         int
+}
+
+// Hooks
+func (r *Review) AfterCreate(tx *gorm.DB) error {
+	// Recalculate movie rating and review count from the reviews table
+	return tx.Exec(`
+		UPDATE movies
+		SET
+			reviews_count = (SELECT COUNT(*) FROM reviews WHERE movie_id = ?),
+			rating = (SELECT AVG(score)::numeric(3,1) FROM reviews WHERE movie_id = ?)
+		WHERE id = ?
+	`, r.MovieID, r.MovieID, r.MovieID).Error
 }

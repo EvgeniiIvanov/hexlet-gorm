@@ -196,33 +196,16 @@ func handleAddReview(db *gorm.DB, args []string) {
 	}
 	text := args[5]
 
-	err = db.Transaction(func(tx *gorm.DB) error {
-		// Create the review
-		review := models.Review{
-			MovieID: uint(movieID),
-			Score:   score,
-			Text:    text,
-		}
-		if err := tx.Create(&review).Error; err != nil {
-			return err
-		}
-
-		// Update reviews_count and recalculate average rating
-		if err := tx.Exec(`
-			UPDATE movies
-			SET
-				reviews_count = (SELECT COUNT(*) FROM reviews WHERE movie_id = ?),
-				rating = (SELECT AVG(score)::numeric(3,1) FROM reviews WHERE movie_id = ?)
-			WHERE id = ?
-		`, movieID, movieID, movieID).Error; err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
+	// Create the review - AfterCreate hook will update movie rating automatically
+	review := models.Review{
+		MovieID: uint(movieID),
+		Score:   score,
+		Text:    text,
+	}
+	if err := db.Create(&review).Error; err != nil {
 		log.Fatal(err)
 	}
+
 	log.Println("review added and movie rating updated")
 }
 

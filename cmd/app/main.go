@@ -83,6 +83,10 @@ func main() {
 		handleMostRated(db)
 	case "add_review":
 		handleAddReview(db, os.Args)
+	case "rating":
+		handleRating(db)
+	case "leaderboard":
+		handleLeaderboard(db)
 	default:
 		log.Fatal("unknown action")
 	}
@@ -193,6 +197,7 @@ func handleAddReview(db *gorm.DB, args []string) {
 	text := args[5]
 
 	err = db.Transaction(func(tx *gorm.DB) error {
+		// Create the review
 		review := models.Review{
 			MovieID: uint(movieID),
 			Score:   score,
@@ -202,9 +207,14 @@ func handleAddReview(db *gorm.DB, args []string) {
 			return err
 		}
 
-		if err := tx.Model(&models.Movie{}).
-			Where("id = ?", movieID).
-			Update("reviews_count", gorm.Expr("reviews_count + 1")).Error; err != nil {
+		// Update reviews_count and recalculate average rating
+		if err := tx.Exec(`
+			UPDATE movies
+			SET
+				reviews_count = (SELECT COUNT(*) FROM reviews WHERE movie_id = ?),
+				rating = (SELECT AVG(score)::numeric(3,1) FROM reviews WHERE movie_id = ?)
+			WHERE id = ?
+		`, movieID, movieID, movieID).Error; err != nil {
 			return err
 		}
 
@@ -212,5 +222,46 @@ func handleAddReview(db *gorm.DB, args []string) {
 	})
 	if err != nil {
 		log.Fatal(err)
+	}
+	log.Println("review added and movie rating updated")
+}
+
+func handleRating(db *gorm.DB) {
+	var movies []models.MovieRatingDTO
+	if err := db.Raw(`
+		SELECT 
+			m.title, 
+			AVG(r.score) as rating, 
+			COUNT(r.id) as reviews_count 
+		FROM movies m
+		LEFT JOIN reviews r ON r.movie_id = m.id
+		GROUP BY m.id, m.title
+		ORDER BY rating DESC NULLS LAST, m.title;
+	`).Scan(&movies).Error; err != nil {
+		log.Fatal(err)
+	}
+	for _, movie := range movies {
+		log.Printf("movie: %s, rating: %.2f, reviews: %d", movie.Title, movie.Rating, movie.ReviewsCount)
+	}
+}
+
+func handleLeaderboard(db *gorm.DB) {
+	var movies []models.MovieLeaderboardDTO
+	if err := db.Raw(`
+		SELECT
+			m.title,
+			COALESCE(AVG(r.score), 0) as rating,
+			COUNT(r.id) as reviews_count,
+			DENSE_RANK() OVER (ORDER BY COALESCE(AVG(r.score), 0) DESC) as rank
+		FROM movies m
+		LEFT JOIN reviews r ON r.movie_id = m.id
+		GROUP BY m.id, m.title
+		ORDER BY rating DESC, m.title;
+	`).Scan(&movies).Error; err != nil {
+		log.Fatal(err)
+	}
+	for _, movie := range movies {
+		log.Printf("rank: %d, movie: %s, rating: %.2f, reviews: %d",
+			movie.Rank, movie.Title, movie.Rating, movie.ReviewsCount)
 	}
 }

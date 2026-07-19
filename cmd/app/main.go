@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 
-	"github.com/EvgeniiIvanov/hexlet-gorm/internal/models"
+	"github.com/EvgeniiIvanov/hexlet-gorm/internal/db"
+	"github.com/EvgeniiIvanov/hexlet-gorm/internal/requests"
 )
 
 func main() {
@@ -22,45 +20,12 @@ func main() {
 		log.Fatal("usage: movies <list|create|show|update|delete> [args]")
 	}
 
-	err := godotenv.Load()
-	if err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Fatal("ошибка загрузки .env file")
 	}
 
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "host=localhost user=gorm password=dev_password_123 dbname=gorm_dev port=5432 sslmode=disable"
-	}
-
-	newLogger := logger.New(
-		log.New(log.Writer(), "\r\n", log.LstdFlags),
-		logger.Config{
-			SlowThreshold: time.Second,
-			LogLevel:      logger.Info,
-			Colorful:      true,
-		},
-	)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: newLogger,
-	})
-
-	if err != nil {
-		log.Fatalf("ошибка подключения: %v", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		log.Fatalf("ошибка доступа к пулу: %v", err)
-	}
-
-	if err := sqlDB.Ping(); err != nil {
-		log.Fatalf("ошибка пинга базы: %v", err)
-	}
-
-	if err := db.AutoMigrate(&models.Movie{}, &models.Actor{}, &models.Director{}, &models.Review{}); err != nil {
-		log.Fatalf("ошибка миграции: %v", err)
-	}
+	// Connect to database
+	database := db.Connect()
 
 	entity := os.Args[1]
 	action := os.Args[2]
@@ -70,35 +35,36 @@ func main() {
 
 	switch action {
 	case "list":
-		handleList(db)
+		handleList(database)
 	case "create":
-		handleCreate(db, os.Args)
+		handleCreate(database, os.Args)
 	case "show":
-		handleShow(db, os.Args)
+		handleShow(database, os.Args)
 	case "update":
-		handleUpdate(db, os.Args)
+		handleUpdate(database, os.Args)
 	case "delete":
-		handleDelete(db, os.Args)
+		handleDelete(database, os.Args)
 	case "unrated":
-		handleUnrated(db)
+		handleUnrated(database)
 	case "most_rated":
-		handleMostRated(db)
+		handleMostRated(database)
 	case "add_review":
-		handleAddReview(db, os.Args)
+		handleAddReview(database, os.Args)
 	case "rating":
-		handleRating(db)
+		handleRating(database)
 	case "leaderboard":
-		handleLeaderboard(db)
+		handleLeaderboard(database)
 	default:
 		log.Fatal("unknown action")
 	}
 }
 
 func handleList(db *gorm.DB) {
-	var movies []models.Movie
-	if err := db.Preload("Director").Find(&movies).Error; err != nil {
+	movies, err := requests.ListMovies(db)
+	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, movie := range movies {
 		log.Printf("movie: %s", movie.Title)
 		if movie.Director.ID != 0 {
@@ -126,13 +92,8 @@ func handleCreate(db *gorm.DB, args []string) {
 		log.Fatal("invalid date format, use YYYY-MM-DD")
 	}
 
-	movie := models.Movie{
-		Title:      title,
-		Genre:      genre,
-		ReleasedAt: releasedAt,
-	}
-
-	if err := db.Create(&movie).Error; err != nil {
+	movie, err := requests.CreateMovie(db, title, genre, releasedAt)
+	if err != nil {
 		if isDuplicateError(err) {
 			log.Fatal("movie with this title already exists")
 		}
@@ -147,8 +108,13 @@ func handleShow(db *gorm.DB, args []string) {
 		log.Fatal("usage: movies show <id>")
 	}
 
-	var movie models.Movie
-	if err := db.Preload("Director").Preload("Actors").First(&movie, args[3]).Error; err != nil {
+	id, err := strconv.ParseUint(args[3], 10, 64)
+	if err != nil {
+		log.Fatal("invalid movie ID")
+	}
+
+	movie, err := requests.GetMovie(db, uint(id))
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Fatal("movie not found")
 		}
@@ -169,15 +135,17 @@ func handleUpdate(db *gorm.DB, args []string) {
 		log.Fatal("usage: movies update <id> <field> <value>")
 	}
 
-	result := db.Model(&models.Movie{}).
-		Where("id = ?", args[3]).
-		Update(args[4], args[5])
-
-	if result.Error != nil {
-		log.Fatal(result.Error)
+	id, err := strconv.ParseUint(args[3], 10, 64)
+	if err != nil {
+		log.Fatal("invalid movie ID")
 	}
 
-	if result.RowsAffected == 0 {
+	rowsAffected, err := requests.UpdateMovie(db, uint(id), args[4], args[5])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if rowsAffected == 0 {
 		log.Fatal("movie not found")
 	}
 
@@ -189,12 +157,17 @@ func handleDelete(db *gorm.DB, args []string) {
 		log.Fatal("usage: movies delete <id>")
 	}
 
-	result := db.Delete(&models.Movie{}, args[3])
-	if result.Error != nil {
-		log.Fatal(result.Error)
+	id, err := strconv.ParseUint(args[3], 10, 64)
+	if err != nil {
+		log.Fatal("invalid movie ID")
 	}
 
-	if result.RowsAffected == 0 {
+	rowsAffected, err := requests.DeleteMovie(db, uint(id))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if rowsAffected == 0 {
 		log.Fatal("movie not found")
 	}
 
@@ -202,10 +175,11 @@ func handleDelete(db *gorm.DB, args []string) {
 }
 
 func handleUnrated(db *gorm.DB) {
-	var movies []models.Movie
-	if err := db.Where("rating IS NULL").Find(&movies).Error; err != nil {
+	movies, err := requests.GetUnratedMovies(db)
+	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, movie := range movies {
 		log.Printf("movie: %s", movie.Title)
 	}
@@ -213,10 +187,11 @@ func handleUnrated(db *gorm.DB) {
 }
 
 func handleMostRated(db *gorm.DB) {
-	var movies []models.Movie
-	if err := db.Where("rating > ?", 8.5).Find(&movies).Error; err != nil {
+	movies, err := requests.GetMostRatedMovies(db)
+	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, movie := range movies {
 		log.Printf("movie: %s", movie.Title)
 	}
@@ -245,21 +220,16 @@ func handleAddReview(db *gorm.DB, args []string) {
 	}
 
 	// Check if movie exists
-	var movie models.Movie
-	if err := db.First(&movie, movieID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Fatal("movie not found")
-		}
+	exists, err := requests.MovieExists(db, uint(movieID))
+	if err != nil {
 		log.Fatal(err)
+	}
+	if !exists {
+		log.Fatal("movie not found")
 	}
 
 	// Create the review - AfterCreate hook will update movie rating automatically
-	review := models.Review{
-		MovieID: uint(movieID),
-		Score:   score,
-		Text:    text,
-	}
-	if err := db.Create(&review).Error; err != nil {
+	if err := requests.CreateReview(db, uint(movieID), score, text); err != nil {
 		if isDuplicateError(err) {
 			log.Fatal("duplicate review: a review with this text already exists for this movie")
 		}
@@ -270,39 +240,22 @@ func handleAddReview(db *gorm.DB, args []string) {
 }
 
 func handleRating(db *gorm.DB) {
-	var movies []models.MovieRatingDTO
-	if err := db.Raw(`
-		SELECT 
-			m.title, 
-			AVG(r.score) as rating, 
-			COUNT(r.id) as reviews_count 
-		FROM movies m
-		LEFT JOIN reviews r ON r.movie_id = m.id
-		GROUP BY m.id, m.title
-		ORDER BY rating DESC NULLS LAST, m.title;
-	`).Scan(&movies).Error; err != nil {
+	movies, err := requests.GetMoviesWithRatings(db)
+	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, movie := range movies {
 		log.Printf("movie: %s, rating: %.2f, reviews: %d", movie.Title, movie.Rating, movie.ReviewsCount)
 	}
 }
 
 func handleLeaderboard(db *gorm.DB) {
-	var movies []models.MovieLeaderboardDTO
-	if err := db.Raw(`
-		SELECT
-			m.title,
-			COALESCE(AVG(r.score), 0) as rating,
-			COUNT(r.id) as reviews_count,
-			DENSE_RANK() OVER (ORDER BY COALESCE(AVG(r.score), 0) DESC) as rank
-		FROM movies m
-		LEFT JOIN reviews r ON r.movie_id = m.id
-		GROUP BY m.id, m.title
-		ORDER BY rating DESC, m.title;
-	`).Scan(&movies).Error; err != nil {
+	movies, err := requests.GetMoviesLeaderboard(db)
+	if err != nil {
 		log.Fatal(err)
 	}
+
 	for _, movie := range movies {
 		log.Printf("rank: %d, movie: %s, rating: %.2f, reviews: %d",
 			movie.Rank, movie.Title, movie.Rating, movie.ReviewsCount)

@@ -5,6 +5,11 @@ help:
 	@echo "  docker-down        - stop and remove PostgreSQL containers"
 	@echo "  docker-clean       - remove containers, volumes, and networks (DESTROYS DATA)"
 	@echo "  docker-clean-force - same as docker-clean but without confirmation"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test               - run all tests"
+	@echo "  test-verbose       - run all tests with verbose output"
+	@echo "  test-cover         - run tests with coverage report"
 
 # Docker Compose command (try both docker-compose and docker compose)
 DOCKER_COMPOSE := $(shell command -v docker-compose 2> /dev/null)
@@ -41,3 +46,20 @@ docker-clean-force:
 	@echo "Removing all containers, volumes, networks, and images..."
 	$(DOCKER_COMPOSE) down -v --remove-orphans --rmi local
 	@echo "All resources cleaned up."
+
+# Test commands
+.PHONY: test
+test:
+	go test ./internal/requests/...
+
+.PHONY: test-verbose
+test-verbose:
+	go test -v ./internal/requests/...
+
+.PHONY: test-cover
+test-cover:
+	go test -cover ./internal/requests/...
+	@echo ""
+	@echo "For detailed HTML coverage report, run:"
+	@echo "  go test -coverprofile=coverage.out ./internal/requests/..."
+	@echo "  go tool cover -html=coverage.out"

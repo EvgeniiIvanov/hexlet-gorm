@@ -10,6 +10,9 @@ help:
 	@echo "  test               - run all tests"
 	@echo "  test-verbose       - run all tests with verbose output"
 	@echo "  test-cover         - run tests with coverage report"
+	@echo "  test-n-plus-one    - check for N+1 query problems"
+	@echo "  bench              - run performance benchmarks"
+	@echo "  bench-compare      - compare baseline vs optimized benchmarks"
 
 # Docker Compose command (try both docker-compose and docker compose)
 DOCKER_COMPOSE := $(shell command -v docker-compose 2> /dev/null)
@@ -63,3 +66,21 @@ test-cover:
 	@echo "For detailed HTML coverage report, run:"
 	@echo "  go test -coverprofile=coverage.out ./internal/requests/..."
 	@echo "  go tool cover -html=coverage.out"
+
+.PHONY: test-n-plus-one
+test-n-plus-one:
+	go test -v -run TestNPlusOneQueries ./internal/requests/
+
+.PHONY: bench
+bench:
+	go test -bench=. -benchmem ./internal/requests/
+
+.PHONY: bench-compare
+bench-compare:
+	@echo "Running baseline benchmarks..."
+	go test -bench=. -benchmem -benchtime=100x ./internal/requests/ > baseline_results.txt
+	@echo "Baseline saved to baseline_results.txt"
+	@echo ""
+	@echo "To compare after optimization:"
+	@echo "  go test -bench=. -benchmem -benchtime=100x ./internal/requests/ > optimized_results.txt"
+	@echo "  benchstat baseline_results.txt optimized_results.txt"

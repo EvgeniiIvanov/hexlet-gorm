@@ -9,13 +9,13 @@ import (
 type Movie struct {
 	ID           uint
 	Title        string `gorm:"size:100;unique;not null"`
-	Genre        string `gorm:"not null"`
+	Genre        string `gorm:"not null;index:idx_movies_genre"`
 	ReleasedAt   time.Time
 	Description  string
-	Rating       float64 `gorm:"type:numeric(3,1)"`
+	Rating       float64 `gorm:"type:numeric(3,1);index:idx_movies_rating"`
 	Reviews      []Review
-	ReviewsCount int
-	DirectorID   *uint
+	ReviewsCount int   `gorm:"index:idx_movies_reviews_count"`
+	DirectorID   *uint `gorm:"index:idx_movies_director_id"`
 	Director     Director
 	Actors       []Actor `gorm:"many2many:movie_actors;"`
 }
@@ -32,7 +32,7 @@ type Actor struct {
 
 type Review struct {
 	ID      uint
-	MovieID uint
+	MovieID uint   `gorm:"index:idx_reviews_movie_id"`
 	Score   int    `gorm:"check:score >= 1 AND score <= 10"`
 	Text    string `gorm:"size:255;not null"`
 }

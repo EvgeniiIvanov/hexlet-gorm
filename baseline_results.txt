@@ -1,0 +1,12 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/EvgeniiIvanov/hexlet-gorm/internal/requests
+cpu: Apple M1 Pro
+BenchmarkListMovies-8                     	     100	    446509 ns/op	  206633 B/op	    3385 allocs/op
+BenchmarkGetMostRatedMovies-8             	     100	     95972 ns/op	   31833 B/op	     614 allocs/op
+BenchmarkGetUnratedMovies-8               	     100	     12342 ns/op	    7825 B/op	      49 allocs/op
+BenchmarkGetMoviesLeaderboard-8           	     100	    157902 ns/op	   19540 B/op	     507 allocs/op
+BenchmarkCreateReviewWithRatingUpdate-8   	     100	     59928 ns/op	   26646 B/op	     293 allocs/op
+BenchmarkGetMovieWithRelations-8          	     100	     73284 ns/op	   28346 B/op	     423 allocs/op
+PASS
+ok  	github.com/EvgeniiIvanov/hexlet-gorm/internal/requests	0.434s

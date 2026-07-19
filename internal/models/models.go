@@ -8,8 +8,8 @@ import (
 
 type Movie struct {
 	ID           uint
-	Title        string `gorm:"size:100;unique"`
-	Genre        string
+	Title        string `gorm:"size:100;unique;not null"`
+	Genre        string `gorm:"not null"`
 	ReleasedAt   time.Time
 	Description  string
 	Rating       float64 `gorm:"type:numeric(3,1)"`
@@ -33,8 +33,8 @@ type Actor struct {
 type Review struct {
 	ID      uint
 	MovieID uint
-	Score   int
-	Text    string
+	Score   int    `gorm:"check:score >= 1 AND score <= 10"`
+	Text    string `gorm:"size:255;not null"`
 }
 
 // DTO
